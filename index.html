@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>bolt66 — Procurement</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -395,6 +396,17 @@
       <button class="ai-btn" id="save-key-btn" onclick="saveApiKey()" disabled>Save API Key</button>
     </div>
 
+    <!-- QR CODE TRANSFER -->
+    <div class="card" style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem" id="qr-card">
+      <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:0.25rem">Transfer to iPhone</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.5">Save your API key on desktop, then scan this QR code with your iPhone camera to open the app with the key pre-filled.</div>
+      <div id="qr-placeholder" style="font-size:12px;color:var(--text3);padding:0.5rem 0">Save your API key first to generate a QR code.</div>
+      <div id="qr-container" style="display:none;text-align:center">
+        <div id="qr-code" style="display:inline-block;background:#fff;padding:12px;border-radius:8px;margin-bottom:0.75rem"></div>
+        <div style="font-size:11px;color:var(--text3);line-height:1.5">Scan with iPhone Camera app.<br>Opens the app with your key pre-filled.</div>
+      </div>
+    </div>
+
     <div class="card" style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem">
       <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:0.25rem">Pricing</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">Markup applied to cost price before adding .66</div>
@@ -489,6 +501,7 @@ function saveApiKey() {
   localStorage.setItem('bolt66_api_key', key);
   showApiKeyStatus('success', '✓ API key saved');
   showToast('API key saved', 'success');
+  generateQR(key);
 }
 
 function checkApiKeyInput() {
@@ -514,12 +527,43 @@ function showApiKeyStatus(type, msg) {
 function loadSettingsScreen() {
   const key = getApiKey();
   const input = document.getElementById('api-key-input');
-  if(key) { input.value = key; showApiKeyStatus('success', '✓ API key saved'); }
+  if(key) {
+    input.value = key;
+    showApiKeyStatus('success', '✓ API key saved');
+    generateQR(key);
+  }
   const markup = localStorage.getItem('bolt66_markup') || '40';
   const markupInput = document.getElementById('markup-input');
   markupInput.value = markup;
   updateMarkupDisplay();
   markupInput.addEventListener('input', updateMarkupDisplay);
+}
+
+function generateQR(key) {
+  const qrContainer = document.getElementById('qr-container');
+  const qrPlaceholder = document.getElementById('qr-placeholder');
+  const qrCode = document.getElementById('qr-code');
+  if(!qrContainer || !key) return;
+
+  // Build a URL that pre-fills the key via hash fragment
+  const baseUrl = window.location.href.split('#')[0].split('?')[0];
+  const url = `${baseUrl}?apikey=${encodeURIComponent(key)}#settings`;
+
+  qrCode.innerHTML = '';
+  try {
+    new QRCode(qrCode, {
+      text: url,
+      width: 180,
+      height: 180,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    qrContainer.style.display = 'block';
+    if(qrPlaceholder) qrPlaceholder.style.display = 'none';
+  } catch(e) {
+    console.error('QR generation failed', e);
+  }
 }
 
 function updateMarkupDisplay() {
@@ -569,7 +613,10 @@ function startAdd(type) {
   state.gradedPhoto = null;
   state.identifiedCards = [];
   document.getElementById('photo-preview').innerHTML = '';
-  document.getElementById('identify-btn').disabled = true;
+  const btn = document.getElementById('identify-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.4';
+  btn.innerHTML = 'Identify cards with AI';
   setCardType(type, null);
   goToStep(1);
   showScreen('add');
@@ -643,7 +690,9 @@ function removePhoto(i) {
 
 function checkPhotosReady() {
   const hasPhotos = state.cardType === 'graded' ? !!state.gradedPhoto : state.photos.length > 0;
-  document.getElementById('identify-btn').disabled = !hasPhotos;
+  const btn = document.getElementById('identify-btn');
+  btn.disabled = !hasPhotos;
+  btn.style.opacity = hasPhotos ? '1' : '0.4';
 }
 
 // ═══ FILE TO BASE64 ═══
@@ -745,7 +794,11 @@ Return ONLY valid JSON (no markdown, no explanation):
 
   } catch(err) {
     console.error(err);
-    showToast('Could not identify cards. Try again.', 'error');
+    if(err.message === 'No API key') {
+      // already handled
+    } else {
+      showToast('Error: ' + (err.message || 'Could not identify cards'), 'error');
+    }
   }
 
   btn.innerHTML = 'Identify cards with AI';
@@ -1134,6 +1187,19 @@ function newBatch() {
 // ═══ INIT ═══
 document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-SG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 updateHomeStats();
+
+// Auto-fill API key from QR scan (?apikey=...)
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const key = params.get('apikey');
+  if(key && key.startsWith('sk-ant-')) {
+    localStorage.setItem('bolt66_api_key', key);
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    showScreen('settings');
+    showToast('API key imported from QR!', 'success');
+  }
+})();
 </script>
 </body>
 </html>
