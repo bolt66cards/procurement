@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>bolt66 — Procurement</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #141414;
+    --bg3: #1e1e1e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --text: #f0f0f0;
+    --text2: #888;
+    --text3: #555;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232,255,71,0.12);
+    --accent-text: #0a0a0a;
+    --red: #ff4f4f;
+    --green: #47ff9a;
+    --blue: #47b8ff;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; min-height: 100vh; overflow-x: hidden; }
+  .mono { font-family: 'DM Mono', monospace; }
+
+  /* SCREENS */
+  .screen { display: none; min-height: 100vh; padding: 0 0 6rem; }
+  .screen.active { display: block; }
+
+  /* TOP BAR */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem 0.75rem; border-bottom: 0.5px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
+  .topbar-logo { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); letter-spacing: 0.05em; }
+  .topbar-title { font-size: 14px; font-weight: 500; color: var(--text2); }
+  .back-btn { background: none; border: none; color: var(--text2); font-size: 20px; cursor: pointer; padding: 4px; line-height: 1; }
+
+  /* STEP INDICATOR */
+  .steps { display: flex; gap: 3px; padding: 0.75rem 1.25rem; }
+  .step-dot { flex: 1; height: 2px; border-radius: 2px; background: var(--border2); transition: background 0.3s; }
+  .step-dot.active { background: var(--accent); }
+  .step-dot.done { background: var(--text3); }
+
+  /* HOME */
+  .home-header { padding: 2rem 1.25rem 1rem; }
+  .home-title { font-size: 26px; font-weight: 300; line-height: 1.2; color: var(--text); margin-bottom: 0.25rem; }
+  .home-title span { color: var(--accent); font-weight: 600; }
+  .home-sub { font-size: 13px; color: var(--text2); }
+  .batch-info { margin: 0 1.25rem 1.25rem; background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .batch-row { display: flex; justify-content: space-between; align-items: center; }
+  .batch-label { font-size: 12px; color: var(--text2); }
+  .batch-val { font-size: 13px; font-family: 'DM Mono', monospace; color: var(--accent); }
+  .batch-counts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 0.75rem; }
+  .count-pill { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; }
+  .count-pill .num { font-size: 20px; font-weight: 500; font-family: 'DM Mono', monospace; }
+  .count-pill .lbl { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .section-title { font-size: 11px; font-weight: 500; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; padding: 0 1.25rem; margin-bottom: 0.5rem; }
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 1.25rem; margin-bottom: 1.5rem; }
+  .action-btn { background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1rem; cursor: pointer; text-align: left; transition: border-color 0.2s, background 0.2s; }
+  .action-btn:active { background: var(--bg2); border-color: var(--border2); transform: scale(0.97); }
+  .action-btn .icon { font-size: 22px; margin-bottom: 0.5rem; display: block; }
+  .action-btn .btn-title { font-size: 14px; font-weight: 500; color: var(--text); display: block; }
+  .action-btn .btn-sub { font-size: 11px; color: var(--text2); margin-top: 2px; display: block; }
+  .action-btn.primary { background: var(--accent-dim); border-color: rgba(232,255,71,0.3); }
+  .action-btn.primary .btn-title { color: var(--accent); }
+  .export-section { padding: 0 1.25rem; }
+  .export-btn { width: 100%; background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 0.875rem 1.25rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; transition: border-color 0.2s; }
+  .export-btn:active { border-color: var(--accent); transform: scale(0.98); }
+  .export-btn-left { display: flex; align-items: center; gap: 10px; }
+  .export-tcg { font-size: 11px; font-weight: 500; font-family: 'DM Mono', monospace; background: var(--accent-dim); color: var(--accent); padding: 3px 8px; border-radius: 20px; }
+  .export-btn-info { font-size: 13px; color: var(--text); }
+  .export-btn-sub { font-size: 11px; color: var(--text2); }
+  .export-arrow { color: var(--text3); font-size: 16px; }
+  .export-btn.has-cards { border-color: rgba(232,255,71,0.2); }
+
+  /* CARD ENTRY */
+  .padded { padding: 0 1.25rem; }
+  .label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; }
+  .seg-control { display: flex; gap: 4px; background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 3px; margin-bottom: 1.25rem; }
+  .seg-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; background: none; color: var(--text2); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .seg-btn.active { background: var(--accent); color: var(--accent-text); }
+  .field { margin-bottom: 1rem; }
+  .field label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; padding: 10px 12px;
+    -webkit-appearance: none; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: none; height: 80px; }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .photo-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 1.5rem 1rem; text-align: center; cursor: pointer; margin-bottom: 1rem; position: relative; overflow: hidden; transition: border-color 0.2s; }
+  .photo-zone:active { border-color: var(--accent); }
+  .photo-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .photo-zone .pz-icon { font-size: 28px; margin-bottom: 6px; }
+  .photo-zone .pz-text { font-size: 13px; color: var(--text2); }
+  .photo-zone .pz-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .photo-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 1rem; }
+  .photo-thumb { aspect-ratio: 3/4; border-radius: var(--radius-sm); background: var(--bg3); border: 0.5px solid var(--border); overflow: hidden; position: relative; }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-thumb .remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); border: none; color: #fff; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ai-btn { width: 100%; padding: 14px; background: var(--accent); color: var(--accent-text); border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.2s; }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ai-btn:active:not(:disabled) { transform: scale(0.98); }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--accent-text); border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* IDENTIFIED CARDS */
+  .card-result { background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 0.75rem; overflow: hidden; }
+  .card-result-header { padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 0.5px solid var(--border); }
+  .card-num { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); }
+  .card-name-result { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; margin: 0 10px; line-height: 1.3; }
+  .card-result-body { padding: 0.75rem 1rem; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 0.75rem; }
+  .tag { font-size: 11px; padding: 3px 8px; border-radius: 20px; border: 0.5px solid var(--border2); color: var(--text2); font-family: 'DM Mono', monospace; }
+  .tag.foil { border-color: rgba(71,184,255,0.4); color: var(--blue); }
+  .tag.rarity { border-color: rgba(232,255,71,0.3); color: var(--accent); }
+  .card-img-row { display: flex; gap: 8px; align-items: flex-start; }
+  .card-img-thumb { width: 70px; height: 98px; border-radius: 6px; object-fit: cover; background: var(--bg2); border: 0.5px solid var(--border); flex-shrink: 0; }
+  .card-img-thumb.placeholder { display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .card-inputs { flex: 1; }
+  .mini-field { margin-bottom: 8px; }
+  .mini-field label { font-size: 11px; color: var(--text2); margin-bottom: 3px; display: block; }
+  .mini-input { width: 100%; background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 6px; color: var(--text); font-size: 14px; padding: 7px 10px; font-family: 'DM Sans', sans-serif; -webkit-appearance: none; outline: none; }
+  .mini-input:focus { border-color: var(--accent); }
+  .price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .price-suggest { background: var(--bg2); border: 0.5px solid rgba(232,255,71,0.3); border-radius: 6px; padding: 7px 10px; }
+  .price-suggest-label { font-size: 10px; color: var(--text2); }
+  .price-suggest-val { font-size: 16px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--accent); }
+  .snkr-row { background: var(--bg2); border: 0.5px solid rgba(71,184,255,0.2); border-radius: 6px; padding: 7px 10px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; }
+  .snkr-label { font-size: 10px; color: var(--blue); }
+  .snkr-val { font-size: 14px; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--blue); }
+  .approve-row { display: flex; gap: 6px; margin-top: 8px; }
+  .approve-btn { flex: 1; padding: 8px; border-radius: 6px; border: 0.5px solid var(--border2); background: none; color: var(--text2); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+  .approve-btn.approved { background: rgba(71,255,154,0.15); border-color: rgba(71,255,154,0.4); color: var(--green); }
+  .approve-btn.rejected { background: rgba(255,79,79,0.1); border-color: rgba(255,79,79,0.3); color: var(--red); }
+  .add-to-batch-btn { width: 100%; padding: 13px; background: none; border: 0.5px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: 0.5rem; transition: all 0.2s; }
+  .add-to-batch-btn.ready { border-color: rgba(71,255,154,0.4); color: var(--green); background: rgba(71,255,154,0.08); }
+  .add-to-batch-btn:active { transform: scale(0.98); }
+
+  /* BATCH LIST */
+  .batch-card { background: var(--bg3); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; overflow: hidden; }
+  .batch-card-header { padding: 0.75rem 1rem; display: flex; align-items: center; gap: 10px; }
+  .bc-sku { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); flex-shrink: 0; }
+  .bc-name { font-size: 13px; color: var(--text); flex: 1; line-height: 1.3; }
+  .bc-price { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--text); flex-shrink: 0; }
+  .bc-tags { display: flex; gap: 5px; padding: 0 1rem 0.75rem; flex-wrap: wrap; }
+  .bc-del { background: none; border: none; color: var(--text3); font-size: 16px; cursor: pointer; padding: 2px 4px; flex-shrink: 0; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 5rem; left: 50%; transform: translateX(-50%); background: var(--bg3); border: 0.5px solid var(--border2); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 13px; white-space: nowrap; z-index: 100; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.success { border-color: rgba(71,255,154,0.4); color: var(--green); }
+  .toast.error { border-color: rgba(255,79,79,0.3); color: var(--red); }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 0.5px solid var(--border); display: flex; z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 0 8px; cursor: pointer; background: none; border: none; color: var(--text3); font-size: 10px; font-family: 'DM Sans', sans-serif; transition: color 0.2s; }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 20px; line-height: 1; }
+  .nav-badge { background: var(--accent); color: var(--accent-text); font-size: 9px; font-weight: 700; border-radius: 10px; padding: 1px 5px; position: absolute; top: 6px; right: calc(50% - 22px); font-family: 'DM Mono', monospace; }
+  .nav-item { position: relative; }
+
+  /* GRADED extras */
+  .grade-field { background: var(--bg3); border: 0.5px solid rgba(71,184,255,0.3); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
+  .grade-field-title { font-size: 12px; color: var(--blue); margin-bottom: 0.75rem; font-weight: 500; }
+
+  .empty-state { text-align: center; padding: 3rem 1.25rem; color: var(--text3); }
+  .empty-state .es-icon { font-size: 40px; margin-bottom: 0.75rem; }
+  .empty-state .es-text { font-size: 14px; }
+
+  .divider { height: 0.5px; background: var(--border); margin: 1rem 0; }
+  .full-btn { width: 100%; padding: 13px; border-radius: var(--radius); border: 0.5px solid; font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
+  .full-btn:active { transform: scale(0.98); }
+  .full-btn.outline { background: none; border-color: var(--border2); color: var(--text2); }
+  .full-btn.danger { background: rgba(255,79,79,0.1); border-color: rgba(255,79,79,0.3); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="showScreen('home')" id="nav-home">
+    <span class="nav-icon">⌂</span>
+    <span>Home</span>
+  </button>
+  <button class="nav-item" onclick="showScreen('add')" id="nav-add">
+    <span class="nav-icon">⊕</span>
+    <span>Add Cards</span>
+  </button>
+  <button class="nav-item" onclick="showScreen('batch')" id="nav-batch">
+    <span class="nav-icon">≡</span>
+    <span>Batch</span>
+    <span class="nav-badge" id="batch-badge" style="display:none">0</span>
+  </button>
+  <button class="nav-item" onclick="showScreen('export')" id="nav-export">
+    <span class="nav-icon">↓</span>
+    <span>Export</span>
+  </button>
+  <button class="nav-item" onclick="showScreen('settings')" id="nav-settings">
+    <span class="nav-icon">⚙</span>
+    <span>Settings</span>
+  </button>
+</nav>
+
+<!-- ═══════════════════════════════════ HOME ═══════════════════════════════════ -->
+<div class="screen active" id="screen-home">
+  <div class="topbar">
+    <span class="topbar-logo mono">bolt66</span>
+    <span class="topbar-title">procurement</span>
+    <button class="back-btn" onclick="newBatch()" title="New batch">↺</button>
+  </div>
+  <div class="home-header">
+    <div class="home-title">Ready to<br><span>procure.</span></div>
+    <div class="home-sub" id="home-date"></div>
+  </div>
+  <div class="batch-info" id="batch-info">
+    <div class="batch-row">
+      <span class="batch-label">Current batch</span>
+      <span class="batch-val mono" id="batch-id-display">—</span>
+    </div>
+    <div class="batch-counts">
+      <div class="count-pill"><div class="num mono" id="count-op">0</div><div class="lbl">One Piece</div></div>
+      <div class="count-pill"><div class="num mono" id="count-pk">0</div><div class="lbl">Pokémon</div></div>
+      <div class="count-pill"><div class="num mono" id="count-mtg">0</div><div class="lbl">MTG</div></div>
+      <div class="count-pill"><div class="num mono" id="count-total">0</div><div class="lbl">Total cards</div></div>
+    </div>
+  </div>
+  <div style="padding: 0 1.25rem; margin-bottom: 1rem;">
+    <p class="section-title">Add cards</p>
+    <div class="action-grid">
+      <button class="action-btn primary" onclick="startAdd('raw')">
+        <span class="icon">🃏</span>
+        <span class="btn-title">Raw Cards</span>
+        <span class="btn-sub">3–4 at a time</span>
+      </button>
+      <button class="action-btn" onclick="startAdd('graded')">
+        <span class="icon">🏆</span>
+        <span class="btn-title">Graded Cards</span>
+        <span class="btn-sub">1 card, your photo</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ ADD CARDS ═══════════════════════════════════ -->
+<div class="screen" id="screen-add">
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <span class="topbar-title" id="add-title">Add Raw Cards</span>
+    <span class="step-badge" id="add-step-badge">Step 1 of 3</span>
+  </div>
+  <div class="steps">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <!-- STEP 1: Photo + TCG -->
+  <div id="step1" class="padded">
+    <div class="field">
+      <label class="label">Card type</label>
+      <div class="seg-control">
+        <button class="seg-btn active" onclick="setCardType('raw', this)">Raw</button>
+        <button class="seg-btn" onclick="setCardType('graded', this)">Graded</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">TCG</label>
+      <div class="seg-control">
+        <button class="seg-btn active" onclick="setTCG('OP', this)">One Piece</button>
+        <button class="seg-btn" onclick="setTCG('PK', this)">Pokémon</button>
+        <button class="seg-btn" onclick="setTCG('MTG', this)">MTG</button>
+      </div>
+    </div>
+
+    <!-- Raw photo zone -->
+    <div id="raw-photo-zone">
+      <div class="photo-zone" onclick="document.getElementById('photo-input').click()">
+        <input type="file" id="photo-input" accept="image/*" capture="environment" multiple onchange="handlePhotos(event)">
+        <div class="pz-icon">📷</div>
+        <div class="pz-text">Take photo of cards</div>
+        <div class="pz-sub">3–4 cards at once · tap to open camera</div>
+      </div>
+    </div>
+
+    <!-- Graded photo zone -->
+    <div id="graded-photo-zone" style="display:none">
+      <div class="grade-field">
+        <div class="grade-field-title">📋 Graded card — use your actual card photo</div>
+        <div class="photo-zone" onclick="document.getElementById('graded-photo-input').click()">
+          <input type="file" id="graded-photo-input" accept="image/*" capture="environment" onchange="handleGradedPhoto(event)">
+          <div class="pz-icon">🏆</div>
+          <div class="pz-text">Photo your graded slab</div>
+          <div class="pz-sub">Shows certificate · proves ownership</div>
+        </div>
+        <div class="row2" style="margin-top:0.75rem">
+          <div class="field" style="margin:0">
+            <label class="label">Grading company</label>
+            <select id="grader-select">
+              <option value="PSA">PSA</option>
+              <option value="BGS">BGS / Beckett</option>
+              <option value="CGC">CGC</option>
+              <option value="ACE">ACE</option>
+              <option value="HGA">HGA</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0">
+            <label class="label">Grade</label>
+            <select id="grade-select">
+              <option value="10">10</option>
+              <option value="9.5">9.5</option>
+              <option value="9">9</option>
+              <option value="8.5">8.5</option>
+              <option value="8">8</option>
+              <option value="7.5">7.5</option>
+              <option value="7">7</option>
+              <option value="6">6</option>
+              <option value="5">5</option>
+              <option value="4">4</option>
+              <option value="3">3</option>
+              <option value="2">2</option>
+              <option value="1">1</option>
+              <option value="AUTH">AUTH</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="photo-preview" id="photo-preview"></div>
+    <button class="ai-btn" id="identify-btn" onclick="identifyCards()" disabled>Identify cards with AI</button>
+  </div>
+
+  <!-- STEP 2: AI Results + Pricing -->
+  <div id="step2" class="padded" style="display:none">
+    <div id="card-results-container"></div>
+    <button class="full-btn outline" id="back-to-step1-btn" onclick="goToStep(1)" style="margin-top:0.5rem">← Retake photo</button>
+  </div>
+
+  <!-- STEP 3: Confirm & Add -->
+  <div id="step3" class="padded" style="display:none">
+    <div id="step3-summary"></div>
+    <button class="ai-btn" id="add-batch-btn" onclick="addToBatch()">Add to batch</button>
+    <button class="full-btn outline" style="margin-top:8px" onclick="goToStep(2)">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ BATCH ═══════════════════════════════════ -->
+<div class="screen" id="screen-batch">
+  <div class="topbar">
+    <span class="topbar-logo mono">bolt66</span>
+    <span class="topbar-title">Current Batch</span>
+    <button class="back-btn" onclick="clearBatch()" title="Clear batch">✕</button>
+  </div>
+  <div class="padded" style="padding-top:1rem">
+    <div id="batch-list-container">
+      <div class="empty-state">
+        <div class="es-icon">📭</div>
+        <div class="es-text">No cards added yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ SETTINGS ═══════════════════════════════════ -->
+<div class="screen" id="screen-settings">
+  <div class="topbar">
+    <span class="topbar-logo mono">bolt66</span>
+    <span class="topbar-title">Settings</span>
+  </div>
+  <div class="padded" style="padding-top:1.25rem">
+
+    <div class="card" style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:0.25rem">Anthropic API Key</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.5">Required for AI card identification, image search, and SNKRDUNK lookup. Get yours at <span style="color:var(--blue);text-decoration:underline;cursor:pointer" onclick="openLink('https://console.anthropic.com')">console.anthropic.com</span></div>
+      <div class="field" style="margin-bottom:0.75rem">
+        <label class="label">API Key</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." style="flex:1;font-family:'DM Mono',monospace;font-size:13px" oninput="checkApiKeyInput()">
+          <button onclick="toggleApiKeyVisibility()" id="eye-btn" style="background:none;border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:8px 10px;color:var(--text2);cursor:pointer;white-space:nowrap;font-size:13px">Show</button>
+        </div>
+      </div>
+      <div id="api-key-status" style="font-size:12px;margin-bottom:0.75rem;display:none"></div>
+      <button class="ai-btn" id="save-key-btn" onclick="saveApiKey()" disabled>Save API Key</button>
+    </div>
+
+    <div class="card" style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:0.25rem">Pricing</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">Markup applied to cost price before adding .66</div>
+      <div class="field" style="margin-bottom:0">
+        <label class="label">Markup %</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="markup-input" value="40" min="0" max="999" style="width:80px">
+          <span style="font-size:14px;color:var(--text2)">% &nbsp;→&nbsp; cost × <span id="markup-multiplier">1.40</span> + .66</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:500;color:var(--text);margin-bottom:0.5rem">About</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">
+        <div>bolt66 Procurement App</div>
+        <div style="color:var(--text3)">One Piece · Pokémon · MTG</div>
+        <div style="color:var(--text3);margin-top:0.5rem">API key is stored locally on your device only.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ EXPORT ═══════════════════════════════════ -->
+<div class="screen" id="screen-export">
+  <div class="topbar">
+    <span class="topbar-logo mono">bolt66</span>
+    <span class="topbar-title">Export to Shopee</span>
+  </div>
+  <div style="padding: 1rem 1.25rem">
+    <p style="font-size:13px; color:var(--text2); margin-bottom:1.25rem">Files are generated per TCG and card type. Only files with cards are shown.</p>
+    <div id="export-list"></div>
+    <div style="margin-top:1.5rem">
+      <button class="full-btn outline" onclick="exportAll()">Download all files</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ANTHROPIC_KEY_HEADER = "x-api-key";
+
+// ═══ STATE ═══
+let state = {
+  cardType: 'raw',
+  tcg: 'OP',
+  photos: [],
+  gradedPhoto: null,
+  identifiedCards: [],
+  batch: [],
+  batchId: generateBatchId()
+};
+
+function generateBatchId() {
+  const d = new Date();
+  return `B${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ═══ SHOPEE CONSTANTS ═══
+const SHOPEE_DESC = `Welcome to bolt66 Cards Online, your one-stop online shop for One Piece, Pokemon, Magic: the Gathering and Sorcery singles! We have the widest selection of cards for sale online. We update our inventory with new cards weekly, so be sure to check back often! \n\nWe kindly ask you to note that our minimum order requirement for cards is $8*. Whatever the size of your order, we are committed to subsidizing half of the delivery cost to ensure your convenience. If the total cart cost is too low, this will result in us paying more than the cost of the cards themselves. We sincerely appreciate your understanding and support in this matter. Thank you!\n\nHere are some of the benefits of shopping with us:\nFree BONUS cards with every order!\nFast shipping: We usually pack and ship off the cards on the same day! However, please note that for orders on Friday Afternoon, Saturday and Sunday will be sent off on the following Monday.\nSecure packaging: We package the cards using toploaders, filler cards and secure packaging materials to ensure they will not be folded or dinged during transit and arrive in the best condition!\n100% satisfaction guarantee: We are committed to providing our customers with a 100% satisfaction guarantee. If you are not happy with your purchase, simply return it for a full refund.\n\n*Note: We reserve the right to cancel the order or should it fall below the minimum amount.`;
+
+const SHOPEE_CATEGORIES = {
+  'OP-raw':    '101400-Hobbies & Collections/Toys & Games/Dice, Board & Card Games',
+  'OP-graded': '101400-Hobbies & Collections/Toys & Games/Dice, Board & Card Games',
+  'PK-raw':    '101400-Hobbies & Collections/Toys & Games/Dice, Board & Card Games',
+  'PK-graded': '101400-Hobbies & Collections/Toys & Games/Dice, Board & Card Games',
+  'MTG-raw':   '101400-Hobbies & Collections/Toys & Games/Dice, Board & Card Games',
+};
+
+const PARENT_SKU = { OP: 'OP', PK: 'PK', MTG: 'MTG' };
+
+const TCG_FULL = { OP: 'One Piece', PK: 'Pokémon', MTG: 'Magic: The Gathering' };
+
+// All 116 columns from actual Shopee template
+const SHOPEE_COLS = ["Category","Product Name","Product Description","Maximum Purchase Quantity","Maximum Purchase Quantity - Start Date","Maximum Purchase Quantity - Time Period (in Days)","Maximum Purchase Quantity - End Date","Minimum Purchase Quantity","Parent SKU","Variation Integration No.","Variation Name1","Option for Variation 1","Image per Variation","Variation Name2","Option for Variation 2","Price","Stock","SKU","Size Chart Template","Size Chart Image","GTIN","Cover image","Item Image 1","Item Image 2","Item Image 3","Item Image 4","Item Image 5","Item Image 6","Item Image 7","Item Image 8","Weight","Length","Width","Height","Doorstep Delivery","Next Day Doorstep Delivery","Pick Lockers","Collection Points","SPX Express Lockers","Singpost - Normal Mail","Pre-order DTS","Brand","Beverage Container Return Scheme","Quantity per\u00a0pack","Volume(ML)","Country of Origin","Weight","Warranty Duration","Feature","Material","Recommended Age","Pattern","Season","Sleeve Length","Style","Frame Type","Frame Material","Hat Style","Leather Type","Graphic Pattern Themes","Volume Capacity","Fan Type","Warranty Type","Bundle Set","Accessory Type","Age Group","Length","Sports Type","Anime/ Manga","Neck Material","Language","Keyboard Type","Idol Type","Traditional Music Instrument","Character","Piano Type","Movie Genre","Guitar Shape","Music Genre","Hand Configuration","Needlework Type","Wind Instrument Type","Artist","Percussion Instrument Type","CD, DVD & Bluray Type","Stone/ Mineral Type","Body Material","Guitar Type","Ukulele Material","Idol","Pickup Configuration","Model Type","Fretboard Material","Lighting Type","Dimension (L x W x H)","Number of Keys","Number of Pages","Number of Strings","Safety Mark","Custom Product","Has BSMI No.","Care Instructions","Closure Type","Quantity per Pack","Theme","Cartoon Characters","Interest","Lock Type","Material Feature","Model Scale","Number of Puzzle Pieces","Puzzle Shape Type","Puzzle Skill Level","Weave","With Remote Control","Fail Reason"];
+
+const SHOPEE_ROW0 = ["ps_category|1|0","ps_product_name|1|0","ps_product_description|1|0","ps_maximum_purchase_quantity|0|0","ps_maximum_purchase_quantity_start_date|0|0","ps_maximum_purchase_quantity_time_period|0|0","ps_maximum_purchase_quantity_end_date|0|0","ps_minimum_purchase_quantity|0|0","ps_sku_parent_short|0|0","et_title_variation_integration_no|0|0","et_title_variation_1|0|0","et_title_option_for_variation_1|0|0","et_title_image_per_variation|0|3","et_title_variation_2|0|0","et_title_option_for_variation_2|0|0","ps_price|1|1","ps_stock|0|1","ps_sku_short|0|0","ps_new_size_chart|0|1","et_title_size_chart|0|3","ps_gtin_code|0|0","ps_item_cover_image|0|3","ps_item_image_1|0|3","ps_item_image_2|0|3","ps_item_image_3|0|3","ps_item_image_4|0|3","ps_item_image_5|0|3","ps_item_image_6|0|3","ps_item_image_7|0|3","ps_item_image_8|0|3","ps_weight|1|1","ps_length|0|1","ps_width|0|1","ps_height|0|1","channel_id.1000|0|0","channel_id.1004|0|0","channel_id.10098|0|0","channel_id.10099|0|0","channel_id.10330|0|0","channel_id.19100|0|0","ps_product_pre_order_dts|0|1","ps_brand|0|1"];
+// pad to 116
+while(SHOPEE_ROW0.length < 116) SHOPEE_ROW0.push('');
+
+const SHOPEE_ROW1 = ["advanced","3a82b9f970b993d620faf81cf239e53e","100639","263681753","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""];
+const SHOPEE_ROW3 = ["Mandatory","Mandatory","Mandatory","Optional","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Optional","Optional","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Mandatory","Conditional Mandatory","Optional","Conditional Mandatory","Conditional Mandatory","Optional","Optional","Optional","Optional","Optional","Optional","Optional","Optional","Optional","Optional","Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Optional","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory","Conditional Mandatory"];
+while(SHOPEE_ROW3.length < 116) SHOPEE_ROW3.push('');
+
+// ═══ API KEY ═══
+function getApiKey() {
+  return localStorage.getItem('bolt66_api_key') || '';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if(!key.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-', 'error'); return; }
+  localStorage.setItem('bolt66_api_key', key);
+  showApiKeyStatus('success', '✓ API key saved');
+  showToast('API key saved', 'success');
+}
+
+function checkApiKeyInput() {
+  const val = document.getElementById('api-key-input').value.trim();
+  document.getElementById('save-key-btn').disabled = val.length < 10;
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('api-key-input');
+  const btn = document.getElementById('eye-btn');
+  if(input.type === 'password') { input.type = 'text'; btn.textContent = 'Hide'; }
+  else { input.type = 'password'; btn.textContent = 'Show'; }
+}
+
+function showApiKeyStatus(type, msg) {
+  const el = document.getElementById('api-key-status');
+  if(!el) return;
+  el.style.display = 'block';
+  el.style.color = type === 'success' ? 'var(--green)' : 'var(--red)';
+  el.textContent = msg;
+}
+
+function loadSettingsScreen() {
+  const key = getApiKey();
+  const input = document.getElementById('api-key-input');
+  if(key) { input.value = key; showApiKeyStatus('success', '✓ API key saved'); }
+  const markup = localStorage.getItem('bolt66_markup') || '40';
+  const markupInput = document.getElementById('markup-input');
+  markupInput.value = markup;
+  updateMarkupDisplay();
+  markupInput.addEventListener('input', updateMarkupDisplay);
+}
+
+function updateMarkupDisplay() {
+  const pct = parseFloat(document.getElementById('markup-input').value) || 40;
+  document.getElementById('markup-multiplier').textContent = (1 + pct/100).toFixed(2);
+  localStorage.setItem('bolt66_markup', pct);
+}
+
+function getMarkup() {
+  return 1 + (parseFloat(localStorage.getItem('bolt66_markup')) || 40) / 100;
+}
+
+function apiCall(body) {
+  const key = getApiKey();
+  if(!key) {
+    showToast('Add your API key in Settings ⚙', 'error');
+    showScreen('settings');
+    throw new Error('No API key');
+  }
+  return fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+// ═══ NAVIGATION ═══
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if(name === 'batch') renderBatchList();
+  if(name === 'export') renderExportList();
+  if(name === 'home') updateHomeStats();
+  if(name === 'settings') loadSettingsScreen();
+}
+
+function startAdd(type) {
+  state.cardType = type;
+  state.photos = [];
+  state.gradedPhoto = null;
+  state.identifiedCards = [];
+  document.getElementById('photo-preview').innerHTML = '';
+  document.getElementById('identify-btn').disabled = true;
+  setCardType(type, null);
+  goToStep(1);
+  showScreen('add');
+}
+
+// ═══ STEP CONTROL ═══
+function goToStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).style.display = i===n ? 'block' : 'none';
+    const dot = document.getElementById('dot'+i);
+    dot.classList.remove('active','done');
+    if(i < n) dot.classList.add('done');
+    else if(i === n) dot.classList.add('active');
+  });
+  document.getElementById('add-step-badge').textContent = `Step ${n} of 3`;
+}
+
+// ═══ TCG + TYPE ═══
+function setTCG(tcg, btn) {
+  state.tcg = tcg;
+  document.querySelectorAll('#step1 .seg-control:nth-child(2) .seg-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+}
+
+function setCardType(type, btn) {
+  state.cardType = type;
+  if(btn) {
+    btn.closest('.seg-control').querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  document.getElementById('raw-photo-zone').style.display = type==='raw' ? 'block' : 'none';
+  document.getElementById('graded-photo-zone').style.display = type==='graded' ? 'block' : 'none';
+  document.getElementById('add-title').textContent = type==='raw' ? 'Add Raw Cards' : 'Add Graded Card';
+  checkPhotosReady();
+}
+
+// ═══ PHOTOS ═══
+function handlePhotos(e) {
+  const files = Array.from(e.target.files).slice(0, 4);
+  state.photos = files;
+  renderPhotoPreviews(files, 'photo-preview');
+  checkPhotosReady();
+}
+
+function handleGradedPhoto(e) {
+  if(e.target.files[0]) {
+    state.gradedPhoto = e.target.files[0];
+    renderPhotoPreviews([state.gradedPhoto], 'photo-preview');
+    checkPhotosReady();
+  }
+}
+
+function renderPhotoPreviews(files, containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  files.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${url}"><button class="remove" onclick="removePhoto(${i})">✕</button>`;
+    container.appendChild(div);
+  });
+}
+
+function removePhoto(i) {
+  if(state.cardType === 'graded') { state.gradedPhoto = null; }
+  else { state.photos.splice(i, 1); }
+  renderPhotoPreviews(state.cardType === 'graded' ? (state.gradedPhoto ? [state.gradedPhoto] : []) : state.photos, 'photo-preview');
+  checkPhotosReady();
+}
+
+function checkPhotosReady() {
+  const hasPhotos = state.cardType === 'graded' ? !!state.gradedPhoto : state.photos.length > 0;
+  document.getElementById('identify-btn').disabled = !hasPhotos;
+}
+
+// ═══ FILE TO BASE64 ═══
+function fileToBase64(file) {
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.readAsDataURL(file);
+  });
+}
+
+// ═══ AI IDENTIFICATION ═══
+async function identifyCards() {
+  const btn = document.getElementById('identify-btn');
+  btn.innerHTML = '<span class="spinner"></span>Identifying...';
+  btn.disabled = true;
+
+  try {
+    const files = state.cardType === 'graded' ? [state.gradedPhoto] : state.photos;
+    const imageContents = await Promise.all(files.map(async f => {
+      const b64 = await fileToBase64(f);
+      const mt = f.type || 'image/jpeg';
+      return { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } };
+    }));
+
+    const isGraded = state.cardType === 'graded';
+    const grader = isGraded ? document.getElementById('grader-select').value : null;
+    const grade = isGraded ? document.getElementById('grade-select').value : null;
+
+    const prompt = isGraded
+      ? `You are a TCG card expert. This is a GRADED card (${grader} grade ${grade}) from ${TCG_FULL[state.tcg]}.
+Identify this single graded card and return ONLY valid JSON (no markdown, no explanation):
+{
+  "cards": [{
+    "cardNumber": "exact card number like OP04-090 or SV3-001 (use hyphens not underscores)",
+    "cardName": "full card name in English",
+    "expansion": "set/expansion name",
+    "rarity": "rarity code like SR, SSR, PSA, IR etc",
+    "language": "English/Japanese/Chinese/Korean/etc",
+    "isFoil": true or false,
+    "isParallel": true or false,
+    "variationLabel": "e.g. FOIL Japanese or English or Japanese Holofoil",
+    "productNameSuffix": "descriptive suffix for listing title e.g. Super Rare P-SR Parallel AA"
+  }]
+}`
+      : `You are a TCG card expert. Identify ALL ${TCG_FULL[state.tcg]} cards visible in this photo (could be 1-4 cards).
+Return ONLY valid JSON (no markdown, no explanation):
+{
+  "cards": [
+    {
+      "cardNumber": "exact card number like OP04-090 or SV3-001 (use hyphens not underscores)",
+      "cardName": "full card name in English",
+      "expansion": "set/expansion name",
+      "rarity": "rarity code like C, U, R, SR, SSR, SEC, IR, SIR, UR etc",
+      "language": "English/Japanese/Chinese/Korean/etc",
+      "isFoil": true or false,
+      "isParallel": true or false,
+      "variationLabel": "e.g. FOIL Japanese or English Holofoil or Japanese",
+      "productNameSuffix": "descriptive suffix for listing title"
+    }
+  ]
+}`;
+
+    const response = await apiCall({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: [...imageContents, { type: "text", text: prompt }] }]
+    });
+
+    const data = await response.json();
+    const text = data.content.map(c => c.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    state.identifiedCards = parsed.cards.map(c => ({
+      ...c,
+      graded: isGraded,
+      grader: grader,
+      grade: grade,
+      tcg: state.tcg,
+      costPrice: '',
+      suggestedPrice: '',
+      finalPrice: '',
+      approvedPrice: false,
+      snkrPrice: null,
+      imageUrl: '',
+      photoDataUrl: isGraded ? URL.createObjectURL(state.gradedPhoto) : null,
+      qty: 1
+    }));
+
+    renderStep2();
+    goToStep(2);
+
+    // Fetch prices and images in background
+    state.identifiedCards.forEach((card, i) => {
+      fetchCardImage(card, i);
+      if(isGraded) fetchSnkrdunk(card, i);
+    });
+
+  } catch(err) {
+    console.error(err);
+    showToast('Could not identify cards. Try again.', 'error');
+  }
+
+  btn.innerHTML = 'Identify cards with AI';
+  btn.disabled = false;
+}
+
+// ═══ SNKRDUNK ═══
+async function fetchSnkrdunk(card, idx) {
+  try {
+    const query = `${card.cardName} ${card.cardNumber} ${card.grader} ${card.grade} pokemon one piece card`;
+    const response = await apiCall({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 300,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content: `Search snkrdunk.com for the current selling price of: ${card.cardName} ${card.cardNumber} ${card.grader} grade ${card.grade}. Return ONLY a JSON like: {"sgd": 99.00} or {"sgd": null} if not found. No other text.` }]
+    });
+    const data = await response.json();
+    const text = data.content.filter(c => c.type === 'text').map(c => c.text).join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    try {
+      const parsed = JSON.parse(clean);
+      state.identifiedCards[idx].snkrPrice = parsed.sgd;
+      updateCardSnkrDisplay(idx, parsed.sgd);
+    } catch(e) {}
+  } catch(e) {}
+}
+
+function updateCardSnkrDisplay(idx, price) {
+  const el = document.getElementById(`snkr-${idx}`);
+  if(el) {
+    if(price) {
+      el.style.display = 'flex';
+      el.querySelector('.snkr-val').textContent = `S$${Number(price).toFixed(2)}`;
+    }
+  }
+}
+
+// ═══ CARD IMAGE SEARCH ═══
+async function fetchCardImage(card, idx) {
+  // For graded or expensive cards, use the provided photo
+  if(card.graded || (card.finalPrice && parseFloat(card.finalPrice) >= 100)) return;
+  try {
+    const query = `${card.cardNumber} ${card.cardName} ${TCG_FULL[card.tcg]} card`;
+    const response = await apiCall({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 300,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      messages: [{ role: "user", content: `Find a direct image URL for this TCG card: ${card.cardNumber} ${card.cardName} from ${TCG_FULL[card.tcg]}. Return ONLY a JSON like: {"url": "https://..."} or {"url": null}. Return the highest quality card scan you can find from official databases or card sites. No other text.` }]
+    });
+    const data = await response.json();
+    const text = data.content.filter(c => c.type === 'text').map(c => c.text).join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    try {
+      const parsed = JSON.parse(clean);
+      if(parsed.url) {
+        state.identifiedCards[idx].imageUrl = parsed.url;
+        const imgEl = document.getElementById(`card-img-${idx}`);
+        if(imgEl) { imgEl.src = parsed.url; imgEl.onerror = () => {}; }
+      }
+    } catch(e) {}
+  } catch(e) {}
+}
+
+// ═══ BUILD SKU ═══
+function buildSKU(card) {
+  let sku = card.cardNumber.replace(/_/g, '-');
+  // Add foil/parallel marker
+  if(card.isParallel) sku += '*';
+  // Add graded suffix
+  if(card.graded) {
+    const grade = card.grade.toString().replace('.', '');
+    sku += `${card.grader}${grade}`;
+  }
+  return sku;
+}
+
+// ═══ BUILD PRODUCT NAME ═══
+function buildProductName(card) {
+  const sku = buildSKU(card);
+  const tcgName = TCG_FULL[card.tcg];
+  const suffix = card.productNameSuffix || card.rarity;
+  if(card.graded) {
+    return `${sku} ${card.cardName} ${card.grader} ${card.grade} ${tcgName} ${suffix}`;
+  }
+  return `${sku} ${card.cardName} ${card.variationLabel ? '*' + card.expansion + '*' : card.expansion} ${tcgName} TCG ${suffix}`;
+}
+
+// ═══ CALCULATE PRICE ═══
+function calcPrice(cost) {
+  const c = parseFloat(cost);
+  if(isNaN(c) || c <= 0) return null;
+  const base = Math.round(c * getMarkup());
+  return base + 0.66;
+}
+
+// ═══ RENDER STEP 2 ═══
+function renderStep2() {
+  const container = document.getElementById('card-results-container');
+  container.innerHTML = '';
+
+  state.identifiedCards.forEach((card, idx) => {
+    const sku = buildSKU(card);
+    const div = document.createElement('div');
+    div.className = 'card-result';
+    div.id = `card-result-${idx}`;
+
+    const imgSrc = card.photoDataUrl || card.imageUrl || '';
+    const imgHtml = `<div class="card-img-thumb placeholder" id="card-img-wrap-${idx}">${imgSrc ? `<img id="card-img-${idx}" src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : '🃏'}</div>`;
+
+    div.innerHTML = `
+      <div class="card-result-header">
+        <span class="card-num mono">${sku}</span>
+        <span class="card-name-result">${card.cardName}</span>
+        ${card.graded ? `<span class="tag" style="border-color:rgba(71,184,255,0.4);color:var(--blue)">${card.grader}${card.grade}</span>` : ''}
+      </div>
+      <div class="card-result-body">
+        <div class="tags">
+          <span class="tag">${TCG_FULL[card.tcg]}</span>
+          <span class="tag">${card.expansion}</span>
+          <span class="tag rarity">${card.rarity}</span>
+          ${card.isFoil ? '<span class="tag foil">FOIL</span>' : ''}
+          ${card.isParallel ? '<span class="tag foil">Parallel</span>' : ''}
+          <span class="tag">${card.language}</span>
+        </div>
+        <div class="card-img-row">
+          ${imgHtml}
+          <div class="card-inputs">
+            <div class="mini-field">
+              <label>Card name (editable)</label>
+              <input class="mini-input" type="text" value="${card.cardName}" onchange="state.identifiedCards[${idx}].cardName = this.value">
+            </div>
+            <div class="mini-field">
+              <label>Variation label</label>
+              <input class="mini-input" type="text" value="${card.variationLabel || ''}" onchange="state.identifiedCards[${idx}].variationLabel = this.value">
+            </div>
+            <div class="row2">
+              <div class="mini-field">
+                <label>Qty</label>
+                <input class="mini-input" type="number" min="1" value="1" onchange="state.identifiedCards[${idx}].qty = parseInt(this.value)||1">
+              </div>
+              <div class="mini-field">
+                <label>Cost price (S$)</label>
+                <input class="mini-input" type="number" min="0" step="0.01" placeholder="0.00" id="cost-${idx}" onchange="updatePrice(${idx}, this.value)">
+              </div>
+            </div>
+            <div class="price-row">
+              <div class="price-suggest">
+                <div class="price-suggest-label">Suggested price</div>
+                <div class="price-suggest-val mono" id="suggest-${idx}">—</div>
+              </div>
+              <div class="mini-field" style="margin:0">
+                <label style="font-size:10px;color:var(--text2)">Final price (S$)</label>
+                <input class="mini-input" type="number" min="0" step="0.01" placeholder="—" id="final-${idx}" onchange="state.identifiedCards[${idx}].finalPrice = this.value">
+              </div>
+            </div>
+            ${card.graded ? `<div class="snkr-row" id="snkr-${idx}" style="display:none">
+              <span class="snkr-label">SNKRDUNK</span>
+              <span class="snkr-val mono">loading...</span>
+            </div>` : ''}
+            ${card.graded ? `<div id="snkr-${idx}" style="display:none" class="snkr-row"><span class="snkr-label">SNKRDUNK</span><span class="snkr-val mono">—</span></div>` : ''}
+          </div>
+        </div>
+        ${!card.graded && !card.photoDataUrl ? `
+        <div style="margin-top:8px">
+          <label class="label" style="font-size:11px">Cover image URL (auto-searching...)</label>
+          <input class="mini-input" type="text" placeholder="https://..." id="imgurl-${idx}" value="${card.imageUrl||''}" onchange="state.identifiedCards[${idx}].imageUrl = this.value">
+        </div>` : ''}
+        ${card.graded || card.photoDataUrl ? `
+        <div style="margin-top:8px">
+          <label class="label" style="font-size:11px">Using your photo as cover image ✓</label>
+        </div>` : ''}
+      </div>`;
+    container.appendChild(div);
+  });
+
+  // Add to batch button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ai-btn';
+  addBtn.style.marginTop = '1rem';
+  addBtn.textContent = `Add ${state.identifiedCards.length} card${state.identifiedCards.length>1?'s':''} to batch`;
+  addBtn.onclick = addToBatch;
+  container.appendChild(addBtn);
+}
+
+function updatePrice(idx, cost) {
+  state.identifiedCards[idx].costPrice = cost;
+  const suggested = calcPrice(cost);
+  const suggestEl = document.getElementById(`suggest-${idx}`);
+  const finalEl = document.getElementById(`final-${idx}`);
+  if(suggested) {
+    suggestEl.textContent = `S$${suggested.toFixed(2)}`;
+    finalEl.value = suggested.toFixed(2);
+    state.identifiedCards[idx].finalPrice = suggested.toFixed(2);
+    state.identifiedCards[idx].suggestedPrice = suggested;
+  } else {
+    suggestEl.textContent = '—';
+  }
+}
+
+// ═══ ADD TO BATCH ═══
+function addToBatch() {
+  // Sync final image URLs from inputs
+  state.identifiedCards.forEach((card, idx) => {
+    const imgInput = document.getElementById(`imgurl-${idx}`);
+    if(imgInput) card.imageUrl = imgInput.value;
+    const finalInput = document.getElementById(`final-${idx}`);
+    if(finalInput && finalInput.value) card.finalPrice = finalInput.value;
+  });
+
+  const valid = state.identifiedCards.filter(c => c.finalPrice && parseFloat(c.finalPrice) > 0);
+  if(valid.length === 0) { showToast('Set a price for at least one card', 'error'); return; }
+
+  valid.forEach(card => {
+    state.batch.push({ ...card, addedAt: Date.now() });
+  });
+
+  updateBadge();
+  updateHomeStats();
+  showToast(`${valid.length} card${valid.length>1?'s':''} added to batch`, 'success');
+
+  // Reset and go home
+  state.identifiedCards = [];
+  state.photos = [];
+  state.gradedPhoto = null;
+  showScreen('home');
+}
+
+// ═══ BATCH LIST ═══
+function renderBatchList() {
+  const container = document.getElementById('batch-list-container');
+  if(state.batch.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="es-icon">📭</div><div class="es-text">No cards added yet</div></div>';
+    return;
+  }
+  container.innerHTML = state.batch.map((card, i) => {
+    const sku = buildSKU(card);
+    const tags = [TCG_FULL[card.tcg], card.graded ? `${card.grader}${card.grade}` : 'Raw', card.rarity, card.language].filter(Boolean);
+    return `<div class="batch-card">
+      <div class="batch-card-header">
+        <span class="bc-sku">${sku}</span>
+        <span class="bc-name">${card.cardName}</span>
+        <span class="bc-price">S$${parseFloat(card.finalPrice).toFixed(2)}</span>
+        <button class="bc-del" onclick="removeFromBatch(${i})">✕</button>
+      </div>
+      <div class="bc-tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function removeFromBatch(i) {
+  state.batch.splice(i, 1);
+  updateBadge();
+  updateHomeStats();
+  renderBatchList();
+}
+
+function clearBatch() {
+  if(state.batch.length === 0) return;
+  if(confirm('Clear all cards from batch?')) {
+    state.batch = [];
+    updateBadge();
+    updateHomeStats();
+    renderBatchList();
+  }
+}
+
+// ═══ EXPORT ═══
+function renderExportList() {
+  const container = document.getElementById('export-list');
+  const groups = getGroups();
+  if(Object.keys(groups).length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="es-icon">📂</div><div class="es-text">No cards in batch yet</div></div>';
+    return;
+  }
+  container.innerHTML = Object.entries(groups).map(([key, cards]) => {
+    const [tcg, type] = key.split('-');
+    return `<div class="export-btn has-cards" onclick="exportFile('${key}')">
+      <div class="export-btn-left">
+        <span class="export-tcg">${tcg}</span>
+        <div>
+          <div class="export-btn-info">${type === 'graded' ? '🏆 Graded' : '🃏 Raw'} · ${cards.length} card${cards.length>1?'s':''}</div>
+          <div class="export-btn-sub">${state.batchId}-${tcg}-${type}.xlsx</div>
+        </div>
+      </div>
+      <span class="export-arrow">↓</span>
+    </div>`;
+  }).join('');
+}
+
+function getGroups() {
+  const groups = {};
+  state.batch.forEach(card => {
+    const key = `${card.tcg}-${card.graded ? 'graded' : 'raw'}`;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(card);
+  });
+  return groups;
+}
+
+function exportAll() {
+  const groups = getGroups();
+  Object.keys(groups).forEach(key => exportFile(key));
+}
+
+function exportFile(groupKey) {
+  const [tcg, type] = groupKey.split('-');
+  const cards = getGroups()[groupKey];
+  if(!cards || cards.length === 0) return;
+
+  const wb = XLSX.utils.book_new();
+
+  // Build Template sheet with exact Shopee format
+  const rows = [];
+  rows.push(SHOPEE_ROW0);
+  rows.push(SHOPEE_ROW1);
+  rows.push(SHOPEE_COLS);
+  rows.push(SHOPEE_ROW3);
+  // Row 4 & 5: description rows (blank for now — template has long descriptions)
+  rows.push(Array(116).fill(''));
+  rows.push(Array(116).fill(''));
+
+  cards.forEach(card => {
+    const sku = buildSKU(card);
+    const productName = buildProductName(card);
+    const category = SHOPEE_CATEGORIES[groupKey] || SHOPEE_CATEGORIES['OP-raw'];
+    const row = Array(116).fill('');
+    row[0] = category;
+    row[1] = productName;
+    row[2] = SHOPEE_DESC;
+    row[8] = PARENT_SKU[tcg];
+    row[10] = 'Language';
+    row[11] = card.variationLabel || card.language;
+    row[15] = parseFloat(card.finalPrice);
+    row[16] = 0;
+    row[17] = sku;
+    row[21] = card.imageUrl || card.photoDataUrl || '';
+    row[30] = 0.1;
+    row[31] = 15;
+    row[32] = 11;
+    row[33] = 1;
+    row[34] = 'On'; row[35] = 'On'; row[36] = 'On'; row[37] = 'On'; row[38] = 'On'; row[39] = 'On';
+    rows.push(row);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Template');
+
+  const filename = `${state.batchId}-${tcg}-${type}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  showToast(`Downloaded ${filename}`, 'success');
+}
+
+// ═══ UI HELPERS ═══
+function updateHomeStats() {
+  const counts = { OP: 0, PK: 0, MTG: 0 };
+  state.batch.forEach(c => counts[c.tcg]++);
+  document.getElementById('count-op').textContent = counts.OP;
+  document.getElementById('count-pk').textContent = counts.PK;
+  document.getElementById('count-mtg').textContent = counts.MTG;
+  document.getElementById('count-total').textContent = state.batch.length;
+  document.getElementById('batch-id-display').textContent = state.batchId;
+}
+
+function updateBadge() {
+  const badge = document.getElementById('batch-badge');
+  badge.textContent = state.batch.length;
+  badge.style.display = state.batch.length > 0 ? 'block' : 'none';
+}
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function newBatch() {
+  if(state.batch.length > 0 && !confirm('Start a new batch? Current batch will be cleared.')) return;
+  state.batch = [];
+  state.batchId = generateBatchId();
+  updateBadge();
+  updateHomeStats();
+  showToast('New batch started', 'success');
+}
+
+// ═══ INIT ═══
+document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-SG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+updateHomeStats();
+</script>
+</body>
+</html>
