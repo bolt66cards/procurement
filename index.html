@@ -340,6 +340,7 @@
     </div>
 
     <div class="photo-preview" id="photo-preview"></div>
+    <div id="debug-status" style="font-size:12px;color:var(--text2);background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:0.75rem;display:none"></div>
     <button class="ai-btn" id="identify-btn" onclick="identifyCards()" disabled>Identify cards with AI</button>
   </div>
 
@@ -688,11 +689,30 @@ function removePhoto(i) {
   checkPhotosReady();
 }
 
+function debug(msg) {
+  const el = document.getElementById('debug-status');
+  if(!el) return;
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
 function checkPhotosReady() {
   const hasPhotos = state.cardType === 'graded' ? !!state.gradedPhoto : state.photos.length > 0;
+  const hasKey = !!getApiKey();
   const btn = document.getElementById('identify-btn');
-  btn.disabled = !hasPhotos;
-  btn.style.opacity = hasPhotos ? '1' : '0.4';
+  if(!hasPhotos) {
+    debug('Waiting for photo...');
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+  } else if(!hasKey) {
+    debug('⚠ No API key — go to ⚙ Settings first');
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+  } else {
+    debug(`✓ ${state.photos.length || 1} photo ready · API key saved · tap to identify`);
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
 }
 
 // ═══ FILE TO BASE64 ═══
@@ -797,6 +817,7 @@ Return ONLY valid JSON (no markdown, no explanation):
     if(err.message === 'No API key') {
       // already handled
     } else {
+      debug('Error: ' + (err.message || 'Unknown error'));
       showToast('Error: ' + (err.message || 'Could not identify cards'), 'error');
     }
   }
