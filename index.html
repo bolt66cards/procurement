@@ -788,7 +788,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 }`;
 
     const response = await apiCall({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 1000,
       messages: [{ role: "user", content: [...imageContents, { type: "text", text: prompt }] }]
     });
@@ -844,7 +844,7 @@ async function fetchSnkrdunk(card, idx) {
   try {
     const query = `${card.cardName} ${card.cardNumber} ${card.grader} ${card.grade} pokemon one piece card`;
     const response = await apiCall({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 300,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{ role: "user", content: `Search snkrdunk.com for the current selling price of: ${card.cardName} ${card.cardNumber} ${card.grader} grade ${card.grade}. Return ONLY a JSON like: {"sgd": 99.00} or {"sgd": null} if not found. No other text.` }]
@@ -877,7 +877,7 @@ async function fetchCardImage(card, idx) {
   try {
     const query = `${card.cardNumber} ${card.cardName} ${TCG_FULL[card.tcg]} card`;
     const response = await apiCall({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 300,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{ role: "user", content: `Find a direct image URL for this TCG card: ${card.cardNumber} ${card.cardName} from ${TCG_FULL[card.tcg]}. Return ONLY a JSON like: {"url": "https://..."} or {"url": null}. Return the highest quality card scan you can find from official databases or card sites. No other text.` }]
