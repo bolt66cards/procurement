@@ -299,15 +299,17 @@
     <!-- Graded photo zone -->
     <div id="graded-photo-zone" style="display:none">
       <div class="grade-field">
-        <div class="grade-field-title">📋 Graded card — use your actual card photo</div>
+        <div class="grade-field-title">🏆 Graded card photos</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:0.75rem;line-height:1.5">For slabs over S$100, your actual photos will be used as listing images (front, back, corners etc). Under S$100, the app will auto-search for an image.</div>
         <div class="photo-zone" style="position:relative;overflow:hidden">
-          <div class="pz-icon">🏆</div>
-          <div class="pz-text">Photo your graded slab</div>
-          <div class="pz-sub">Shows certificate · proves ownership</div>
-          <input type="file" id="graded-photo-input" accept="image/*" capture="environment"
+          <div class="pz-icon">📷</div>
+          <div class="pz-text">Add slab photos</div>
+          <div class="pz-sub">Up to 8 photos · front, back, corners, cert</div>
+          <input type="file" id="graded-photo-input" accept="image/*" multiple
             style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px"
-            onchange="handleGradedPhoto(event)">
+            onchange="handleGradedPhotos(event)">
         </div>
+        <div class="photo-preview" id="graded-photo-preview" style="margin-top:0.5rem"></div>
         <div class="row2" style="margin-top:0.75rem">
           <div class="field" style="margin:0">
             <label class="label">Grading company</label>
@@ -458,7 +460,7 @@ let state = {
   cardType: 'raw',
   tcg: 'OP',
   photos: [],
-  gradedPhoto: null,
+  gradedPhotos: [],
   identifiedCards: [],
   batch: [],
   batchId: generateBatchId()
@@ -615,7 +617,7 @@ function showScreen(name) {
 function startAdd(type) {
   state.cardType = type;
   state.photos = [];
-  state.gradedPhoto = null;
+  state.gradedPhotos = [];
   state.identifiedCards = [];
   document.getElementById('photo-preview').innerHTML = '';
   const btn = document.getElementById('identify-btn');
@@ -666,12 +668,30 @@ function handlePhotos(e) {
   checkPhotosReady();
 }
 
-function handleGradedPhoto(e) {
-  if(e.target.files[0]) {
-    state.gradedPhoto = e.target.files[0];
-    renderPhotoPreviews([state.gradedPhoto], 'photo-preview');
-    checkPhotosReady();
-  }
+function handleGradedPhotos(e) {
+  const files = Array.from(e.target.files).slice(0, 8);
+  state.gradedPhotos = [...state.gradedPhotos, ...files].slice(0, 8);
+  renderGradedPreviews();
+  checkPhotosReady();
+}
+
+function renderGradedPreviews() {
+  const container = document.getElementById('graded-photo-preview');
+  if(!container) return;
+  container.innerHTML = '';
+  state.gradedPhotos.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${url}"><button class="remove" onclick="removeGradedPhoto(${i})">✕</button>`;
+    container.appendChild(div);
+  });
+}
+
+function removeGradedPhoto(i) {
+  state.gradedPhotos.splice(i, 1);
+  renderGradedPreviews();
+  checkPhotosReady();
 }
 
 function renderPhotoPreviews(files, containerId) {
@@ -701,7 +721,7 @@ function debug(msg) {
 }
 
 function checkPhotosReady() {
-  const hasPhotos = state.cardType === 'graded' ? !!state.gradedPhoto : state.photos.length > 0;
+  const hasPhotos = state.cardType === 'graded' ? state.gradedPhotos.length > 0 : state.photos.length > 0;
   const hasKey = !!getApiKey();
   const btn = document.getElementById('identify-btn');
   if(!hasPhotos) {
@@ -713,7 +733,8 @@ function checkPhotosReady() {
     btn.disabled = true;
     btn.style.opacity = '0.4';
   } else {
-    debug(`✓ ${state.photos.length || 1} photo ready · API key saved · tap to identify`);
+    const count = state.cardType === 'graded' ? state.gradedPhotos.length : state.photos.length;
+    debug(`✓ ${count} photo${count>1?'s':''} ready · API key saved · tap to identify`);
     btn.disabled = false;
     btn.style.opacity = '1';
   }
@@ -721,10 +742,25 @@ function checkPhotosReady() {
 
 // ═══ FILE TO BASE64 ═══
 function fileToBase64(file) {
-  return new Promise(res => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.readAsDataURL(file);
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxDim = 1024;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim) {
+        if(w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      res(b64);
+    };
+    img.onerror = rej;
+    img.src = url;
   });
 }
 
@@ -742,11 +778,10 @@ async function identifyCards() {
   btn.disabled = true;
 
   try {
-    const files = state.cardType === 'graded' ? [state.gradedPhoto] : state.photos;
+    const files = state.cardType === 'graded' ? state.gradedPhotos : state.photos;
     const imageContents = await Promise.all(files.map(async f => {
       const b64 = await fileToBase64(f);
-      const mt = f.type || 'image/jpeg';
-      return { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } };
+      return { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } };
     }));
 
     const isGraded = state.cardType === 'graded';
@@ -812,7 +847,7 @@ Return ONLY valid JSON (no markdown, no explanation):
       approvedPrice: false,
       snkrPrice: null,
       imageUrl: '',
-      photoDataUrl: isGraded ? URL.createObjectURL(state.gradedPhoto) : null,
+      photoDataUrls: isGraded ? state.gradedPhotos.map(f => URL.createObjectURL(f)) : [],
       qty: 1
     }));
 
@@ -872,10 +907,8 @@ function updateCardSnkrDisplay(idx, price) {
 
 // ═══ CARD IMAGE SEARCH ═══
 async function fetchCardImage(card, idx) {
-  // For graded or expensive cards, use the provided photo
-  if(card.graded || (card.finalPrice && parseFloat(card.finalPrice) >= 100)) return;
+  // Always auto-search for stock image
   try {
-    const query = `${card.cardNumber} ${card.cardName} ${TCG_FULL[card.tcg]} card`;
     const response = await apiCall({
       model: "claude-sonnet-4-6",
       max_tokens: 300,
@@ -891,6 +924,13 @@ async function fetchCardImage(card, idx) {
         state.identifiedCards[idx].imageUrl = parsed.url;
         const imgEl = document.getElementById(`card-img-${idx}`);
         if(imgEl) { imgEl.src = parsed.url; imgEl.onerror = () => {}; }
+        const urlInput = document.getElementById(`imgurl-${idx}`);
+        if(urlInput) urlInput.value = parsed.url;
+        const prompt = document.getElementById(`manual-prompt-${idx}`);
+        if(prompt) prompt.textContent = '✓ Stock image found';
+      } else {
+        const prompt = document.getElementById(`manual-prompt-${idx}`);
+        if(prompt) prompt.textContent = '⚠ No stock image found — paste URL manually above';
       }
     } catch(e) {}
   } catch(e) {}
@@ -939,7 +979,7 @@ function renderStep2() {
     div.className = 'card-result';
     div.id = `card-result-${idx}`;
 
-    const imgSrc = card.photoDataUrl || card.imageUrl || '';
+    const imgSrc = card.photoDataUrls && card.photoDataUrls.length > 0 ? card.photoDataUrls[0] : (card.imageUrl || '');
     const imgHtml = `<div class="card-img-thumb placeholder" id="card-img-wrap-${idx}">${imgSrc ? `<img id="card-img-${idx}" src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:6px">` : '🃏'}</div>`;
 
     div.innerHTML = `
@@ -995,15 +1035,32 @@ function renderStep2() {
             ${card.graded ? `<div id="snkr-${idx}" style="display:none" class="snkr-row"><span class="snkr-label">SNKRDUNK</span><span class="snkr-val mono">—</span></div>` : ''}
           </div>
         </div>
-        ${!card.graded && !card.photoDataUrl ? `
-        <div style="margin-top:8px">
-          <label class="label" style="font-size:11px">Cover image URL (auto-searching...)</label>
-          <input class="mini-input" type="text" placeholder="https://..." id="imgurl-${idx}" value="${card.imageUrl||''}" onchange="state.identifiedCards[${idx}].imageUrl = this.value">
+        ${card.graded ? `
+        <div style="margin-top:8px;background:var(--bg2);border:0.5px solid rgba(71,184,255,0.3);border-radius:6px;padding:8px 10px">
+          <div style="font-size:11px;color:var(--blue);margin-bottom:6px">🏆 Slab photos required (${card.photoDataUrls && card.photoDataUrls.length > 0 ? card.photoDataUrls.length + ' added' : 'none yet'})</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px" id="manual-thumbs-${idx}">
+            ${(card.photoDataUrls||[]).map((url,pi) => `<img src="${url}" style="width:48px;height:64px;object-fit:cover;border-radius:4px;border:0.5px solid var(--border2)">`).join('')}
+          </div>
+          <label style="display:block;position:relative;overflow:hidden;background:var(--bg3);border:0.5px solid var(--border2);border-radius:6px;padding:7px 10px;text-align:center;font-size:12px;color:var(--text2);cursor:pointer">
+            + Add slab photos (front, back, corners, cert)
+            <input type="file" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer" onchange="addManualPhotos(${idx}, event)">
+          </label>
         </div>` : ''}
-        ${card.graded || card.photoDataUrl ? `
-        <div style="margin-top:8px">
-          <label class="label" style="font-size:11px">Using your photo as cover image ✓</label>
+        ${!card.graded ? `
+        <div style="margin-top:8px" id="manual-section-${idx}">
+          <div style="font-size:11px;color:var(--text3)" id="manual-prompt-${idx}">Stock image auto-searching...</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px" id="manual-thumbs-${idx}"></div>
+          <div id="manual-upload-${idx}" style="display:none;margin-top:6px">
+            <label style="display:block;position:relative;overflow:hidden;background:var(--bg2);border:0.5px solid rgba(232,255,71,0.2);border-radius:6px;padding:7px 10px;text-align:center;font-size:12px;color:var(--accent);cursor:pointer">
+              + Add real card photos (optional, recommended for high-value)
+              <input type="file" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer" onchange="addManualPhotos(${idx}, event)">
+            </label>
+          </div>
         </div>` : ''}
+        <div style="margin-top:6px">
+          <label class="label" style="font-size:11px">Stock image URL</label>
+          <input class="mini-input" type="text" placeholder="Auto-searching..." id="imgurl-${idx}" value="${card.imageUrl||''}" onchange="state.identifiedCards[${idx}].imageUrl = this.value">
+        </div>
       </div>`;
     container.appendChild(div);
   });
@@ -1017,6 +1074,18 @@ function renderStep2() {
   container.appendChild(addBtn);
 }
 
+function addManualPhotos(idx, e) {
+  const files = Array.from(e.target.files);
+  if(!state.identifiedCards[idx].manualPhotos) state.identifiedCards[idx].manualPhotos = [];
+  state.identifiedCards[idx].manualPhotos = [...state.identifiedCards[idx].manualPhotos, ...files].slice(0, 8);
+  const thumbs = document.getElementById(`manual-thumbs-${idx}`);
+  if(thumbs) {
+    const existing = (state.identifiedCards[idx].photoDataUrls || []).map(url => `<img src="${url}" style="width:48px;height:64px;object-fit:cover;border-radius:4px;border:0.5px solid var(--border2)">`).join('');
+    const manual = state.identifiedCards[idx].manualPhotos.map(f => `<img src="${URL.createObjectURL(f)}" style="width:48px;height:64px;object-fit:cover;border-radius:4px;border:0.5px solid rgba(232,255,71,0.3)">`).join('');
+    thumbs.innerHTML = existing + manual;
+  }
+}
+
 function updatePrice(idx, cost) {
   state.identifiedCards[idx].costPrice = cost;
   const suggested = calcPrice(cost);
@@ -1027,6 +1096,17 @@ function updatePrice(idx, cost) {
     finalEl.value = suggested.toFixed(2);
     state.identifiedCards[idx].finalPrice = suggested.toFixed(2);
     state.identifiedCards[idx].suggestedPrice = suggested;
+    // Show manual photo prompt for raw cards $100+
+    if(!state.identifiedCards[idx].graded) {
+      const uploadSection = document.getElementById(`manual-upload-${idx}`);
+      const prompt = document.getElementById(`manual-prompt-${idx}`);
+      if(uploadSection && suggested >= 100) {
+        uploadSection.style.display = 'block';
+        if(prompt) prompt.textContent = '📸 High-value card — consider adding real photos:';
+      } else if(uploadSection) {
+        uploadSection.style.display = 'none';
+      }
+    }
   } else {
     suggestEl.textContent = '—';
   }
