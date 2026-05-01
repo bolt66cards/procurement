@@ -730,6 +730,13 @@ function fileToBase64(file) {
 
 // ═══ AI IDENTIFICATION ═══
 async function identifyCards() {
+  const key = getApiKey();
+  if(!key) {
+    debug('⚠ No API key — go to ⚙ Settings');
+    showScreen('settings');
+    return;
+  }
+  debug('Sending to AI... key=' + key.substring(0,12) + '...');
   const btn = document.getElementById('identify-btn');
   btn.innerHTML = '<span class="spinner"></span>Identifying...';
   btn.disabled = true;
@@ -787,6 +794,8 @@ Return ONLY valid JSON (no markdown, no explanation):
     });
 
     const data = await response.json();
+    if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    if(!data.content) throw new Error('Empty response: ' + JSON.stringify(data));
     const text = data.content.map(c => c.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
